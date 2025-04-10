@@ -1,20 +1,14 @@
-
-from datetime import datetime
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from database.db_connection import get_db
 from database.models import Video, Channel
-from database.models import User,UserSavedVideo
-from fastapi import APIRouter, Depends, Query,HTTPException
-from services.trend_service import detect_trending_topics
-from services.title_generator_service import generate_ai_titles
-from services.engagement_service import calculate_engagement_rate,calculate_view_to_subscriber_ratio,calculate_view_velocity
-from functionalities.current_user import get_current_user
-from services.youtube_service import fetch_youtube_videos,fetch_video_by_id,store_videos_in_db
-
+from database.models import User, UserSavedVideo
+from functionality.current_user import get_current_user
+from fastapi import APIRouter, Depends, Query, HTTPException
+from service.youtube_service import fetch_youtube_videos, fetch_video_by_id
+from service.engagement_service import calculate_engagement_rate, calculate_view_to_subscriber_ratio, calculate_view_velocity
 
 router = APIRouter()
-# Mock database for saved videos
 saved_videos = []
 
 class VideoSaveRequest(BaseModel):
@@ -34,34 +28,29 @@ def get_videos(
 ):
     return fetch_youtube_videos(query, max_results, duration_category, min_views, min_subscribers, upload_date)
 
-
 @router.get("/video/{videoid}")
 def get_video_details(videoid: str):
     video_data = fetch_video_by_id(videoid)
     return video_data
 
-
-
 @router.post("/video/save/{video_id}")
-def save_video(video_id: str, db: Session = Depends(get_db), current_user: int = Depends(get_current_user)):
-
+def save_video(
+    video_id: str, 
+    db: Session = Depends(get_db), 
+    user: User = Depends(get_current_user)
+    ):
     """API endpoint to save a video by video ID."""
-    
-    print(f"Saving video {video_id} for user {current_user}")
+    print(f"Saving video {video_id} for user {user.id}")
 
-  
     video_details = fetch_video_by_id(video_id)
 
-    
     if "error" in video_details:
         raise HTTPException(status_code=404, detail="Video not found")
 
- 
-    user = db.query(User).filter(User.id == current_user).first()
+    user = db.query(User).filter(User.id == user.id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-   
     existing_channel = db.query(Channel).filter_by(channel_id=video_details["channel_id"]).first()
     
     if not existing_channel:
@@ -82,7 +71,6 @@ def save_video(video_id: str, db: Session = Depends(get_db), current_user: int =
         video_details["view_velocity"] = calculate_view_velocity(video_details)
         video_details["engagement_rate"] = calculate_engagement_rate(video_details)
 
-     
         new_video = Video(
             video_id=video_details["video_id"],
             title=video_details["title"],
@@ -107,41 +95,39 @@ def save_video(video_id: str, db: Session = Depends(get_db), current_user: int =
     else:
         video = existing_video  
 
-   
     existing_entry = (
         db.query(UserSavedVideo)
-        .filter(UserSavedVideo.user_id == current_user, UserSavedVideo.video_id == video_id)
+        .filter(UserSavedVideo.user_id == user.id, UserSavedVideo.video_id == video_id)
         .first()
     )
 
     if existing_entry:
         raise HTTPException(status_code=400, detail="Video already saved")
 
-   
-    saved_video = UserSavedVideo(user_id=current_user, video_id=video_id)
+    saved_video = UserSavedVideo(user_id=user.id, video_id=video_id)
     db.add(saved_video)
     db.commit()
     db.refresh(saved_video)
 
-    print(f"Saved video {video_id} successfully for user {current_user}!")
+    print(f"Saved video {video_id} successfully for user {user.id}!")
 
     return {"message": "Video saved successfully!", "video_id": video_id}
 
-
 @router.get("/video/saved/")
-def get_saved_videos(db: Session = Depends(get_db), current_user: int = Depends(get_current_user)):
+def get_saved_videos(
+    db: Session = Depends(get_db), 
+    user: User = Depends(get_current_user)
+    ):
     """Retrieve all saved videos for the current user."""
 
-   
     saved_videos = (
         db.query(Video)
         .join(UserSavedVideo, Video.video_id == UserSavedVideo.video_id)
-        .filter(UserSavedVideo.user_id == current_user)
+        .filter(UserSavedVideo.user_id == user.id)
         .all()
     )
 
-    print(f"User {current_user} saved videos:", saved_videos)  
-
+    print(f"User {user.id} saved videos:", saved_videos)  
 
     if not saved_videos:
         raise HTTPException(status_code=404, detail="No saved videos found")
@@ -167,4 +153,3 @@ def get_saved_videos(db: Session = Depends(get_db), current_user: int = Depends(
             for video in saved_videos
         ]
     }
-

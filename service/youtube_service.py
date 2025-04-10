@@ -1,33 +1,51 @@
-
-import requests
 import os
-from dotenv import load_dotenv
-from datetime import datetime, timedelta
 import re
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine
-from sqlalchemy.exc import IntegrityError
+import requests
 from database.models import Video
-from database.db_connection import Base
-from services.engagement_service import (
+from config import YOUTUBE_API_KEY
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from datetime import datetime, timedelta
+from sqlalchemy.exc import IntegrityError
+from service.engagement_service import (
     calculate_view_to_subscriber_ratio,
     calculate_view_velocity,
     calculate_engagement_rate,
 )
 
-# Load environment variables
-load_dotenv()
-
-# YouTube API Key
-YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 BASE_URL = "https://www.googleapis.com/youtube/v3"
+YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
 
-# Database setup (assuming you're using SQLAlchemy)
 DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
 session = Session()
 
+def fetch_video_thumbnails(keyword):
+    params = {
+        "part": "snippet",
+        "q": keyword,
+        "maxResults": 10,
+        "type": "video",
+        "key": YOUTUBE_API_KEY
+    }
+    
+    response = requests.get(YOUTUBE_SEARCH_URL, params=params).json()
+    print("YouTube API Response:", response)
+    videos = []
+    
+    for item in response.get("items", []):
+        video_id = item["id"]["videoId"]
+        snippet = item["snippet"]
+        
+        if "shorts" not in snippet["title"].lower():
+            videos.append({
+                "video_id": video_id,
+                "title": snippet["title"],
+                "thumbnail_url": snippet["thumbnails"]["high"]["url"]
+            })
+    
+    return videos
 
 def get_published_after(filter_option):
     """Convert filter option into an ISO 8601 datetime string."""
@@ -47,7 +65,6 @@ def get_published_after(filter_option):
     
     return None 
 
-
 def fetch_youtube_videos(query, max_results=10, duration_category=None, min_views=None, min_subscribers=None, upload_date=None):
     """Fetch YouTube videos with optional filters, excluding Shorts (videos under 60 seconds)."""
     
@@ -63,12 +80,10 @@ def fetch_youtube_videos(query, max_results=10, duration_category=None, min_view
         "key": YOUTUBE_API_KEY,
     }
 
-    
     if upload_date:
         published_after = get_published_after(upload_date)
         if published_after:
             search_params["publishedAfter"] = published_after
-
    
     if duration_category:
         search_params["videoDuration"] = duration_category  
@@ -85,7 +100,6 @@ def fetch_youtube_videos(query, max_results=10, duration_category=None, min_view
         title = item["snippet"]["title"]
         thumbnail_url = item["snippet"]["thumbnails"]["high"]["url"]
 
-        
         if "shorts" in title.lower():
             continue  
 
@@ -104,7 +118,6 @@ def fetch_youtube_videos(query, max_results=10, duration_category=None, min_view
     if not video_ids:
         return []
 
-   
     stats_url = f"{BASE_URL}/videos"
     stats_params = {
         "part": "statistics,contentDetails",
@@ -120,13 +133,11 @@ def fetch_youtube_videos(query, max_results=10, duration_category=None, min_view
         duration_str = item.get("contentDetails", {}).get("duration", "PT0S")
         video_duration = parse_duration_to_seconds(duration_str)
 
-
         print(f"Video ID: {video_ids[i]} | Duration: {video_duration} seconds")  
 
         if video_duration == 0:
             continue
 
-      
         if video_duration < 240: 
             video_duration_label = "short"
         elif video_duration <= 1200:  
@@ -134,11 +145,9 @@ def fetch_youtube_videos(query, max_results=10, duration_category=None, min_view
         else:  
             video_duration_label = "long"
 
-       
         if duration_category and duration_category != video_duration_label:
             continue  
 
-        
         videos[i]["views"] = int(stats.get("viewCount", 0))
         videos[i]["likes"] = int(stats.get("likeCount", 0))
         videos[i]["comments"] = int(stats.get("commentCount", 0))
@@ -196,14 +205,12 @@ def parse_duration_to_seconds(duration):
     
     return total_seconds
 
-
 if __name__ == "__main__":
     query = "football"
     results = fetch_youtube_videos(query, duration_category="medium")  
     print("\nFinal Results:")
     for video in results:
         print(f"{video['title']} | Duration: {video['duration']}s | Views: {video['views']}")
-
 
 def store_videos_in_db(videos):
     """Store fetched videos in the database."""
@@ -236,7 +243,6 @@ def store_videos_in_db(videos):
             session.rollback()
             print(f"Video {video['video_id']} already exists in the database.")
 
-
 def fetch_video_by_id(video_id):
     """Fetch details for a single video using its video ID."""
     if not YOUTUBE_API_KEY:
@@ -260,7 +266,6 @@ def fetch_video_by_id(video_id):
     duration_str = item.get("contentDetails", {}).get("duration", "PT0S")
     video_duration = parse_duration_to_seconds(duration_str)
 
-   
     channel_id = item["snippet"]["channelId"]
     channel_url = f"{BASE_URL}/channels"
     channel_params = {
@@ -292,6 +297,3 @@ def fetch_video_by_id(video_id):
     }
 
     return video_details
-
-
-

@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routes import viral_idea_finder,title_generation
+from routes import viral_idea_finder,title_generation,thumbnail,script
 from routes import viral_idea_finder,auth
 from database.db_connection import create_tables
 
@@ -17,6 +17,9 @@ app.include_router(viral_idea_finder.router, prefix="/viral_idea_finder", tags=[
 app.include_router(title_generation.router, prefix="/title_generation", tags=["Title Generation"])
 
 
+app.include_router(thumbnail.thumbnail_router, prefix="/thumbnails", tags=["Thumbnail Finder and Validator"])
+
+app.include_router(script.script_router, prefix="/script", tags=["Script Generation"])
 
 
 @app.get("/")

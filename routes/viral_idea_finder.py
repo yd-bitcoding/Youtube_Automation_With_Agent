@@ -5,7 +5,7 @@ from database.models import Video, Channel
 from database.models import User, UserSavedVideo
 from functionality.current_user import get_current_user
 from fastapi import APIRouter, Depends, Query, HTTPException
-from service.youtube_service import fetch_youtube_videos, fetch_video_by_id
+from service.youtube_service import fetch_youtube_videos, fetch_video_by_id,fetch_homepage_videos
 from service.engagement_service import calculate_engagement_rate, calculate_view_to_subscriber_ratio, calculate_view_velocity
 
 router = APIRouter()
@@ -15,6 +15,14 @@ class VideoSaveRequest(BaseModel):
     video_id: str
     title: str
     description: str
+
+@router.get("/videos")
+async def get_homepage_videos():
+    """
+    Fetches popular YouTube videos for the homepage and returns them as JSON.
+    """
+    videos = fetch_homepage_videos()  # Call the dedicated function for home page videos
+    return {"videos": videos}
 
 @router.get("/search/")
 def get_videos(

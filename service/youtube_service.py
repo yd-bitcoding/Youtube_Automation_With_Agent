@@ -13,13 +13,75 @@ from service.engagement_service import (
     calculate_engagement_rate,
 )
 
+YOUTUBE_API_URL = "https://www.googleapis.com/youtube/v3/videos"
 BASE_URL = "https://www.googleapis.com/youtube/v3"
 YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
+CHANNEL_API_URL = "https://www.googleapis.com/youtube/v3/channels"
+
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
 session = Session()
+
+def fetch_homepage_videos():
+    """
+    Fetches popular videos for the home page.
+    """
+    params = {
+        "part": "snippet.statistics",
+        "chart": "mostPopular",  # Fetch most popular videos
+        "regionCode": "IN",      # Set region (you can change it to any country code)
+        "maxResults": 10,        # Number of videos to return
+        "key": YOUTUBE_API_KEY           # API key for authentication
+    }
+
+    response = requests.get(YOUTUBE_API_URL, params=params)
+
+    if response.status_code == 200:
+        data = response.json()
+        videos = []
+
+        for video in data["items"]:
+            video_id = video["id"]
+            snippet = video["snippet"]
+            statistics = video["statistics"]
+
+            # Get channel information
+            channel_id = snippet["channelId"]
+            channel_url = f"{CHANNEL_API_URL}?part=snippet,statistics&id={channel_id}&key={YOUTUBE_API_KEY}"
+            channel_response = requests.get(channel_url).json()
+            channel_data = channel_response["items"][0]["statistics"]
+
+            # Extract video details
+            video_details = {
+                "title": snippet["title"],
+                "thumbnail": snippet["thumbnails"]["medium"]["url"],
+                "url": f"https://www.youtube.com/watch?v={video_id}",
+                "views": int(statistics.get("viewCount", 0)),
+                "likes": int(statistics.get("likeCount", 0)),
+                "comments": int(statistics.get("commentCount", 0)),
+                "upload_date": snippet["publishedAt"],
+                "channel_name": snippet["channelTitle"],
+                "channel_id": channel_id,
+                "subscribers": int(channel_data.get("subscriberCount", 0)),
+            }
+
+            # Calculate engagement metrics
+            video_details["view_to_subscriber_ratio"] = calculate_view_to_subscriber_ratio(
+                video_details["views"], video_details["subscribers"]
+            )
+            video_details["view_velocity"] = calculate_view_velocity(video_details)
+            video_details["engagement_rate"] = calculate_engagement_rate(video_details)
+
+            videos.append(video_details)
+
+        return videos
+    else:
+        return {"error": "Failed to fetch data from YouTube API"}
+
+
+
 
 def fetch_video_thumbnails(keyword):
     params = {

@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from database.models import Video,TrendingTopic
-from services.utils import extract_keywords
+from service.utils import extract_keywords
 from sqlalchemy.dialects.postgresql import insert
 
 

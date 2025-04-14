@@ -1,10 +1,12 @@
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from typing import Optional
 from database.db_connection import get_db
 from database.models import Video, Channel
+from database.schemas import SaveVideoRequest
 from database.models import User, UserSavedVideo
 from functionality.current_user import get_current_user
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException,Body
 from service.youtube_service import fetch_youtube_videos, fetch_video_by_id,fetch_homepage_videos
 from service.engagement_service import calculate_engagement_rate, calculate_view_to_subscriber_ratio, calculate_view_velocity
 
@@ -44,6 +46,7 @@ def get_video_details(videoid: str):
 @router.post("/video/save/{video_id}")
 def save_video(
     video_id: str, 
+    data: Optional[SaveVideoRequest] = Body(default=None),  # Use Body() to receive data from the body
     db: Session = Depends(get_db), 
     user: User = Depends(get_current_user)
     ):
@@ -62,7 +65,6 @@ def save_video(
     existing_channel = db.query(Channel).filter_by(channel_id=video_details["channel_id"]).first()
     
     if not existing_channel:
-       
         new_channel = Channel(
             channel_id=video_details["channel_id"],
             name=video_details["channel_name"],
@@ -74,7 +76,6 @@ def save_video(
     existing_video = db.query(Video).filter_by(video_id=video_id).first()
 
     if not existing_video:
-      
         video_details["view_to_subscriber_ratio"] = calculate_view_to_subscriber_ratio(video_details["views"], video_details["subscribers"])
         video_details["view_velocity"] = calculate_view_velocity(video_details)
         video_details["engagement_rate"] = calculate_engagement_rate(video_details)
@@ -116,6 +117,12 @@ def save_video(
     db.add(saved_video)
     db.commit()
     db.refresh(saved_video)
+
+    # Check and print incoming data
+    if data:
+        print(f"Incoming data: {data.note}")
+    else:
+        print("No data received.")
 
     print(f"Saved video {video_id} successfully for user {user.id}!")
 

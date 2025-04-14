@@ -1,10 +1,10 @@
 import os
 from langgraph.graph import StateGraph
 from dotenv import load_dotenv
-from services.youtube_service import fetch_youtube_videos
-from services.engagement_service import calculate_engagement_rate
-from services.trend_service import detect_trending_topics
-from services.title_generator_service import generate_ai_titles
+from service.youtube_service import fetch_youtube_videos
+from service.engagement_service import calculate_engagement_rate
+from service.trend_service import detect_trending_topics
+from service.title_generator_service import generate_ai_titles
 from database.db_connection import SessionLocal  #
 from sqlalchemy.dialects.postgresql import insert
 load_dotenv()

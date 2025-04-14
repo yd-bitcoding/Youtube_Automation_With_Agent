@@ -5,6 +5,18 @@ from sqlalchemy import Column, String, Integer, Text, DateTime, func, JSON, Fore
 
 Base = declarative_base()
 
+class ActivityLog(Base):
+    __tablename__ = "activity_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    action = Column(String, nullable=False)
+    description = Column(String, nullable=False)
+    log_metadata = Column("metadata", JSON, nullable=True)  # Changed 'metadata' to 'log_metadata'
+    timestamp = Column(DateTime, default=func.now())
+
+    user = relationship("User", back_populates="activity_logs")
+
 class Thumbnail(Base):
     __tablename__ = "thumbnails"
     id = Column(Integer, primary_key=True, index=True)
@@ -58,7 +70,7 @@ class User(Base):
     role = Column(String, default="user")  # "admin" or "user"
     login_history = relationship("UserLoginHistory", back_populates="user", cascade="all, delete-orphan") 
    
-
+    activity_logs = relationship("ActivityLog", back_populates="user")
     saved_thumbnails = relationship("Thumbnail", back_populates="user", cascade="all, delete-orphan")
     generated_script = relationship("Script", back_populates="user", cascade="all, delete-orphan")
     remixed_script = relationship("RemixedScript", back_populates="user", cascade="all, delete-orphan")

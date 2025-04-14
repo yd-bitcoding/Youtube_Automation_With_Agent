@@ -29,7 +29,7 @@ def fetch_homepage_videos():
     Fetches popular videos for the home page.
     """
     params = {
-        "part": "snippet.statistics",
+        "part": "snippet,statistics",
         "chart": "mostPopular",  # Fetch most popular videos
         "regionCode": "IN",      # Set region (you can change it to any country code)
         "maxResults": 10,        # Number of videos to return
@@ -50,8 +50,13 @@ def fetch_homepage_videos():
             # Get channel information
             channel_id = snippet["channelId"]
             channel_url = f"{CHANNEL_API_URL}?part=snippet,statistics&id={channel_id}&key={YOUTUBE_API_KEY}"
-            channel_response = requests.get(channel_url).json()
-            channel_data = channel_response["items"][0]["statistics"]
+            channel_response = requests.get(channel_url)
+            if channel_response.status_code == 200:
+                channel_data = channel_response.json()["items"][0]["statistics"]
+            else:
+                print(f"Error fetching channel data: {channel_response.status_code}")
+                channel_data = {}
+
 
             # Extract video details
             video_details = {
@@ -78,6 +83,7 @@ def fetch_homepage_videos():
 
         return videos
     else:
+        print(f"Error {response.status_code}: {response.text}")
         return {"error": "Failed to fetch data from YouTube API"}
 
 

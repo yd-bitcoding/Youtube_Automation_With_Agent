@@ -2,13 +2,13 @@ from fastapi import FastAPI
 from routes import viral_idea_finder,title_generation,thumbnail,script
 from routes import viral_idea_finder,auth
 from database.db_connection import create_tables
-
+from service.logger import LogUserActivityMiddleware
 
 app = FastAPI(title="Kreato.AI")
 
 
 create_tables()
-
+app.add_middleware(LogUserActivityMiddleware)
 app.include_router(auth.router, prefix="/authentication", tags=["Authentication"])
 
 

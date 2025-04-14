@@ -6,14 +6,13 @@ from langchain.tools import Tool
 from sqlalchemy.orm import Session
 from langchain_community.llms import Ollama
 from database.models import GeneratedTitle
-from langchain.memory import ConversationBufferMemory
 from langchain.agents import initialize_agent, AgentType
 
 load_dotenv()
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
-llm = Ollama(model="llama3.2:1b")  
+llm = Ollama(model="llama3.2:1b")
 
 def extract_video_id(youtube_url: str) -> str:
     """Extracts video ID from a YouTube URL."""
@@ -50,8 +49,7 @@ def process_generated_titles(response: str) -> list:
 
     titles = response.strip().split("\n")
     titles = [re.sub(r"^\d+[\.\)]?\s*", "", title).strip() for title in titles if title.strip()]
-    
-    return titles[:5]  
+    return titles[0:6]  
 
 def generate_titles_prompt(video_topic: str, video_description: str = "") -> str:
     """Creates a structured prompt for generating video titles."""
@@ -75,14 +73,11 @@ title_tool = Tool(
     description="Generates 5 viral YouTube video titles based on a YouTube video URL or a topic."
 )
 
-memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-
 agent = initialize_agent(
     tools=[title_tool],
     llm=llm,
     agent=AgentType.OPENAI_FUNCTIONS,
     verbose=True,
-    memory=memory,
     handle_parsing_errors=True
 )
 
@@ -96,13 +91,23 @@ def generate_ai_titles(user_input: str, user_id: int, db: Session):
         raise TypeError(f"Expected 'db' to be a Session instance, but got {type(db)}")
 
     try:
-        response = agent.invoke({"input": generate_titles_prompt(user_input)})
+        # Generate titles based on the YouTube URL or topic.
+        if detect_input_type(user_input) == "url":
+            video_topic, video_description = get_video_metadata(user_input)
+            if not video_topic:
+                raise ValueError("Failed to retrieve video metadata from YouTube URL.")
+            prompt = generate_titles_prompt(video_topic, video_description)
+        else:
+            prompt = generate_titles_prompt(user_input)
+        
+        response = agent.invoke({"input": prompt})
+        
         if isinstance(response, dict) and "output" in response:
             response = response["output"]
         if not isinstance(response, str):
             raise ValueError(f"Unexpected agent response format: {response}")
-    except Exception:
-        raise ValueError("Failed to generate titles. Please try again later.")
+    except Exception as e:
+        raise ValueError(f"Failed to generate titles. Error: {e}")
 
     titles = process_generated_titles(response)
 

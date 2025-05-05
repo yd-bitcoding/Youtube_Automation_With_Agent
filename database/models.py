@@ -5,6 +5,16 @@ from sqlalchemy import Column, String, Integer, Text, DateTime, func, JSON, Fore
 
 Base = declarative_base()
 
+class UserPrompt(Base):
+    __tablename__ = "user_prompts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    prompt_name = Column(String, index=True)  # Name for the prompt
+    prompt_content = Column(Text)  # Customizable prompt
+    user_id = Column(Integer, ForeignKey('users.id'))
+
+    # Define the relationship from UserPrompt to User
+    user = relationship('User', back_populates='prompts')
 class ActivityLog(Base):
     __tablename__ = "activity_logs"
 
@@ -69,7 +79,7 @@ class User(Base):
     is_active = Column(Boolean, default=False)
     role = Column(String, default="user")  # "admin" or "user"
     login_history = relationship("UserLoginHistory", back_populates="user", cascade="all, delete-orphan") 
-   
+    prompts = relationship('UserPrompt', back_populates='user')
     activity_logs = relationship("ActivityLog", back_populates="user")
     saved_thumbnails = relationship("Thumbnail", back_populates="user", cascade="all, delete-orphan")
     generated_script = relationship("Script", back_populates="user", cascade="all, delete-orphan")
@@ -142,7 +152,7 @@ class UserSavedVideo(Base):
 
     video_id = Column(String(50), ForeignKey("videos.video_id", ondelete="CASCADE"), primary_key=True)
     folder_name = Column(String(100))
-    saved_at = Column(DateTime, default=datetime.datetime.now)
+    saved_at = Column(DateTime, default=func.now())
 
     user = relationship("User", back_populates="saved_videos")
     video = relationship("Video", back_populates="saved_by_users")
@@ -156,3 +166,4 @@ class GeneratedTitle(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
 
     user = relationship("User", back_populates="generated_titles")
+

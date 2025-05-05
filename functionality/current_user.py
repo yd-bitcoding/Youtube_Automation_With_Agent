@@ -3,7 +3,7 @@ from database.models import User
 from sqlalchemy.orm import Session
 from database.db_connection import get_db
 from fastapi import HTTPException, Depends
-from functionality.jwt_token import decodeJWT
+from functionality.jwt_funcationality import decodeJWT
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 jwt_bearer = HTTPBearer()

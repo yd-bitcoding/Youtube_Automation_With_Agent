@@ -7,7 +7,7 @@ from database.schemas import SaveVideoRequest
 from database.models import User, UserSavedVideo
 from functionality.current_user import get_current_user
 from fastapi import APIRouter, Depends, Query, HTTPException,Body
-from service.youtube_service import fetch_youtube_videos, fetch_video_by_id,fetch_homepage_videos
+from service.youtube_service import fetch_youtube_videos, fetch_video_by_id,fetch_homepage_videos,fetch_related_videos
 from service.engagement_service import calculate_engagement_rate, calculate_view_to_subscriber_ratio, calculate_view_velocity
 
 router = APIRouter()
@@ -42,6 +42,14 @@ def get_videos(
 def get_video_details(videoid: str):
     video_data = fetch_video_by_id(videoid)
     return video_data
+
+@router.get("/related_videos/{video_id}")
+def get_related_videos(
+    video_id: str,
+    max_results: int = Query(5, description="Number of related videos to return", ge=1, le=50),
+    db: Session = Depends(get_db)
+):
+    return fetch_related_videos(video_id, max_results)
 
 @router.post("/video/save/{video_id}")
 def save_video(
@@ -168,3 +176,31 @@ def get_saved_videos(
             for video in saved_videos
         ]
     }
+
+@router.delete("/video/save/{video_id}")
+def delete_saved_video(
+    video_id: str, 
+    db: Session = Depends(get_db), 
+    user: User = Depends(get_current_user)
+):
+    """API endpoint to delete a saved video by video ID."""
+    print(f"Deleting saved video {video_id} for user {user.id}")
+
+    # Check if the user has already saved the video
+    existing_entry = (
+        db.query(UserSavedVideo)
+        .filter(UserSavedVideo.user_id == user.id, UserSavedVideo.video_id == video_id)
+        .first()
+    )
+
+    # If no such saved video exists, return a 404 error
+    if not existing_entry:
+        raise HTTPException(status_code=404, detail="Saved video not found for this user")
+
+    # Delete the saved video entry from the database
+    db.delete(existing_entry)
+    db.commit()
+
+    print(f"Deleted saved video {video_id} for user {user.id} successfully!")
+
+    return {"message": f"Video with ID {video_id} has been successfully deleted from your saved videos."}

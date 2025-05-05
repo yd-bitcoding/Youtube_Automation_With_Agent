@@ -1,6 +1,7 @@
 import os
 import re
 import requests
+from typing import List, Dict
 from database.models import Video
 from config import YOUTUBE_API_KEY
 from sqlalchemy import create_engine
@@ -60,6 +61,7 @@ def fetch_homepage_videos():
 
             # Extract video details
             video_details = {
+                "video_id": video_id,
                 "title": snippet["title"],
                 "thumbnail": snippet["thumbnails"]["medium"]["url"],
                 "url": f"https://www.youtube.com/watch?v={video_id}",
@@ -248,6 +250,64 @@ def fetch_youtube_videos(query, max_results=10, duration_category=None, min_view
     filtered_videos.sort(key=lambda x: (x["view_to_subscriber_ratio"], x["view_velocity"], x["engagement_rate"]), reverse=True)
     store_videos_in_db(filtered_videos)  
     return filtered_videos
+
+
+def get_video_title(video_id: str) -> str:
+    """Fetch the title of the video based on its videoId"""
+    params = {
+        "part": "snippet",
+        "id": video_id,
+        "key": YOUTUBE_API_KEY,
+    }
+    
+    response = requests.get(f"{BASE_URL}/videos", params=params)
+    response.raise_for_status()  # Raise error for non-200 status
+    data = response.json()
+    
+    if "items" in data and len(data["items"]) > 0:
+        return data["items"][0]["snippet"]["title"]
+    else:
+        raise ValueError("Video not found")
+
+def fetch_related_videos(video_id: str, max_results: int = 5) -> List[Dict]:
+    """Fetch related videos based on videoId by first getting the video title"""
+    if not YOUTUBE_API_KEY:
+        raise ValueError("YouTube API Key is missing.")
+
+    # Step 1: Fetch the title of the video
+    title = get_video_title(video_id)
+    
+    # Step 2: Use the video title to search for related videos
+    params = {
+        "part": "snippet",
+        "q": title,
+        "type": "video",
+        "maxResults": max_results,
+        "key": YOUTUBE_API_KEY,
+    }
+
+    try:
+        response = requests.get(f"{BASE_URL}/search", params=params)
+        print("Request params:", params)  # Debug
+        print("Request URL:", response.url)  # Debug
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        print("YouTube API error:", e.response.text)
+        return []
+
+    data = response.json()
+    return [
+        {
+            "video_id": item["id"]["videoId"],
+            "title": item["snippet"]["title"],
+            "thumbnail": item["snippet"]["thumbnails"]["high"]["url"],
+            "channel_id": item["snippet"]["channelId"],
+            "channel_name": item["snippet"]["channelTitle"],
+            "video_url": f"https://www.youtube.com/watch?v={item['id']['videoId']}"
+        }
+        for item in data.get("items", [])
+        if "videoId" in item.get("id", {})
+    ]
 
 def calculate_ctr(clicks, impressions):
     """Calculate the CTR (Click-Through Rate)."""

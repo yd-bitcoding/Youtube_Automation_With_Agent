@@ -12,3 +12,10 @@ class UserLogin(BaseModel):
 
 class SaveVideoRequest(BaseModel):
     note: Optional[str] = None
+
+class RemixTitleRequest(BaseModel):
+    title_id: int
+    custom_prompt: Optional[str] = None
+    
+class RemixedTitlesResponse(BaseModel):
+    remixed_titles: List[str]
